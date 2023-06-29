@@ -29,24 +29,24 @@ class State(NamedTuple):
         ):
             msg = (self.open_msgs[0],)
             # success
-            yield self._replace(
+            yield f"suc", self._replace(
                 http_ok=self.http_ok + msg, received_msgs=self.received_msgs | set(msg), sync=SyncState.Waiting
             )
             # failure
-            yield self._replace(http_err=self.http_ok + msg, sync=SyncState.Waiting)
+            yield "fail", self._replace(http_err=self.http_ok + msg, sync=SyncState.Waiting)
         return
         yield
 
     def handle_err(self):
-        for i, _ in enumerate(self.http_err):
-            new_http_err = tuple(msg for msg, j in enumerate(self.http_err) if i != j)
-            yield self._replace(http_err=new_http_err, sync=SyncState.Idle)
+        for i, err in enumerate(self.http_err):
+            new_http_err = tuple(msg for j, msg in enumerate(self.http_err) if i != j)
+            yield f"err {err}", self._replace(http_err=new_http_err, sync=SyncState.Idle)
         return
         yield
 
     def handle_ok(self):
-        for i, _ in enumerate(self.http_ok):
-            new_http_ok = tuple(msg for msg, j in enumerate(self.http_ok) if i != j)
+        for i, msg in enumerate(self.http_ok):
+            new_http_ok = tuple(msg for j, msg in enumerate(self.http_ok) if i != j)
             if not self.open_msgs:
                 # ignore if nothing left to send
                 new_open_msgs = self.open_msgs
@@ -54,7 +54,7 @@ class State(NamedTuple):
                 # otherwise pop one from queue
                 new_open_msgs = self.open_msgs[1:]
 
-            yield self._replace(http_ok=new_http_ok, open_msgs=new_open_msgs, sync=SyncState.Idle)
+            yield f"ok {msg}", self._replace(http_ok=new_http_ok, open_msgs=new_open_msgs, sync=SyncState.Idle)
         return
         yield
 
@@ -69,21 +69,22 @@ class State(NamedTuple):
 
 def check(s: State):
     states = frozenset({s})
-    parent = {s: None}
+    parent = {s: ("init", None)}
 
     def trace(s):
         nonlocal parent
         print("Illegal State found!")
+        msg = ""
         while s is not None:
-            print(s)
-            s = parent[s]
+            print(msg, "\t", s)
+            msg, s = parent[s]
 
     def expand(s) -> bool:
         nonlocal states
-        for n in s.next():
+        for msg, n in s.next():
             if n in states:
                 continue
-            parent[n] = s
+            parent[n] = (msg, s)
             if not n.safety():
                 trace(n)
                 return False
@@ -96,15 +97,15 @@ def check(s: State):
 
 
 def trace(s: State, max_len=100):
-    n = [s]
+    n = [("init", s)]
     i = 0
     while len(n) != 0 and i < max_len:
         i += 1
-        s = random.choice(n)
-        print(s)
+        msg, s = random.choice(n)
+        print(msg, "\t", s)
         n = list(set(s.next()))
 
 
 if __name__ == "__main__":
-    print(check(State()))
-    # print(trace(State()))
+    # print(check(State()))
+    print(trace(State()))
