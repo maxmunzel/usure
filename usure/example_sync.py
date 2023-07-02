@@ -68,6 +68,6 @@ class AtLeastOnceDelivery(NamedTuple):
 
 
 if __name__ == "__main__":
-    from .core import check
+    from .core import check_safety
 
-    check(AtLeastOnceDelivery())
+    check_safety(AtLeastOnceDelivery())

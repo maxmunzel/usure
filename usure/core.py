@@ -1,4 +1,5 @@
-from typing import Protocol, Iterable
+from typing import Protocol, Iterable, NamedTuple
+import random
 import networkx as nx
 
 
@@ -17,10 +18,16 @@ class State(Protocol):
         ...
 
 
-def check(init: State) -> nx.DiGraph:
+class CheckResult(NamedTuple):
+    unsafe_states: set[State]
+    state_graph: nx.DiGraph
+
+
+def check(init: State) -> CheckResult:
     graph = nx.DiGraph()
     graph.add_node(init)
     unsafe_states = set()
+    result = CheckResult(unsafe_states=unsafe_states, state_graph=graph)
 
     def expand(s: State):
         if not s.safety():
@@ -33,26 +40,33 @@ def check(init: State) -> nx.DiGraph:
 
     expand(init)
 
-    if not unsafe_states:
-        return graph
+    return result
 
-    distance_from_init, path_from_init = nx.single_source_dijkstra(graph, init)  # type: ignore
+
+def check_safety(init: State) -> bool:
+    res: CheckResult = check(init)
+
+    if not res.unsafe_states:
+        return True
+
+    distance_from_init, path_from_init = nx.single_source_dijkstra(res.state_graph, init)  # type: ignore
     distance_from_init: dict[State, float]
     path_from_init: dict[State, list[State]]
 
     shortest_unsafe: State
     shortest_unsafe, _ = min(
-        (state, distance_from_init[state]) for state in unsafe_states
+        (state, distance_from_init[state]) for state in res.unsafe_states
     )
 
     prev: State = init
+    print("Found unsafe state with the following trace:\n")
     print(f"Init\t{init}")
     for state in path_from_init[shortest_unsafe][1:]:
-        msg = graph.edges[prev, state]["msg"]
+        msg = res.state_graph.edges[prev, state]["msg"]
         print(f"{msg}\t{state}")
         prev = state
 
-    return graph
+    return False
 
 
 def trace(s: State, max_len=100):
@@ -63,7 +77,3 @@ def trace(s: State, max_len=100):
         msg, s = random.choice(n)
         print(msg, "\t", s)
         n = list(set(s.next()))
-
-
-if __name__ == "__main__":
-    print(check(State()))
