@@ -1,4 +1,5 @@
 from typing import Protocol, Iterable
+import networkx as nx
 
 
 class State(Protocol):
@@ -16,34 +17,37 @@ class State(Protocol):
         ...
 
 
-def check(s: State):
-    states = frozenset({s})
-    parent = {s: ("init", None)}
+def check(s: State) -> nx.DiGraph:
+    graph = nx.DiGraph()
+    graph.add_node(s)
+    unsafe_states = set()
 
-    def trace(s):
-        nonlocal parent
-        print("Illegal State found!")
-        msg = ""
-        while s is not None:
-            print(msg, "\t", s)
-            msg, s = parent[s]
-
-    def expand(s) -> bool:
-        nonlocal states
+    def expand(s: State):
+        if not s.safety():
+            unsafe_states.add(s)
         for msg, n in s.next():
-            if n in states:
-                continue
-            parent[n] = (msg, s)
-            if not n.safety():
-                trace(n)
-                return False
-            states |= {n}
-            if not expand(n):
-                return False
-        return True
+            if n not in graph.nodes:
+                expand(n)
+            graph.add_edge(s, n)  # todo, msg
 
     expand(s)
-    return len(states)
+
+    if not unsafe_states:
+        return graph
+
+    distance_from_init, path_from_init = nx.single_source_dijkstra(graph, s)
+    distance_from_init: dict[State, float]
+    path_from_init: dict[State, list[State]]
+
+    shortest_unsafe: State
+    shortest_unsafe, _ = min(
+        (state, distance_from_init[state]) for state in unsafe_states
+    )
+
+    for n in path_from_init[shortest_unsafe]:
+        print(n)
+
+    return graph
 
 
 def trace(s: State, max_len=100):

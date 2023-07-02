@@ -4,5 +4,5 @@ version = "1.0.0"
 dependencies = [
     "requests",
     'importlib-metadata; python_version<"3.8"',
-    "igraph>=0.10.4"
+    "networkx>=3.1"
 ]
