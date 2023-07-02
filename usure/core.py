@@ -17,9 +17,9 @@ class State(Protocol):
         ...
 
 
-def check(s: State) -> nx.DiGraph:
+def check(init: State) -> nx.DiGraph:
     graph = nx.DiGraph()
-    graph.add_node(s)
+    graph.add_node(init)
     unsafe_states = set()
 
     def expand(s: State):
@@ -28,14 +28,15 @@ def check(s: State) -> nx.DiGraph:
         for msg, n in s.next():
             if n not in graph.nodes:
                 expand(n)
-            graph.add_edge(s, n)  # todo, msg
+            graph.add_edge(s, n)
+            graph.edges[s, n]["msg"] = msg
 
-    expand(s)
+    expand(init)
 
     if not unsafe_states:
         return graph
 
-    distance_from_init, path_from_init = nx.single_source_dijkstra(graph, s)
+    distance_from_init, path_from_init = nx.single_source_dijkstra(graph, init)  # type: ignore
     distance_from_init: dict[State, float]
     path_from_init: dict[State, list[State]]
 
@@ -44,8 +45,12 @@ def check(s: State) -> nx.DiGraph:
         (state, distance_from_init[state]) for state in unsafe_states
     )
 
-    for n in path_from_init[shortest_unsafe]:
-        print(n)
+    prev: State = init
+    print(f"Init\t{init}")
+    for state in path_from_init[shortest_unsafe][1:]:
+        msg = graph.edges[prev, state]["msg"]
+        print(f"{msg}\t{state}")
+        prev = state
 
     return graph
 

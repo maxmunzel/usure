@@ -22,18 +22,20 @@ class AtLeastOnceDelivery(NamedTuple):
         ):
             msg = (self.open_msgs[0],)
             # success
-            yield f"suc", self._replace(
+            yield f"SendSuccessfully {msg[0]}", self._replace(
                 http_ok=self.http_ok + msg, received_msgs=self.received_msgs | set(msg)
             )
             # failure
-            yield "fail", self._replace(http_err=self.http_ok + msg)
+            yield f"SendButFail      {msg[0]}", self._replace(
+                http_err=self.http_ok + msg
+            )
         return
         yield
 
     def handle_err(self):
         for i, err in enumerate(self.http_err):
             new_http_err = tuple(msg for j, msg in enumerate(self.http_err) if i != j)
-            yield f"err {err}", self._replace(http_err=new_http_err)
+            yield f"ErrorCallback    {err}", self._replace(http_err=new_http_err)
         return
         yield
 
@@ -47,7 +49,7 @@ class AtLeastOnceDelivery(NamedTuple):
                 # otherwise pop one from queue, iff its the correct one
                 new_open_msgs = self.open_msgs[1:]
 
-            yield f"ok {msg}", self._replace(
+            yield f"OkCallback       {msg}", self._replace(
                 http_ok=new_http_ok, open_msgs=new_open_msgs
             )
         return
